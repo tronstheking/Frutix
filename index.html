@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Inventario Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Ionicons -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <!-- jsPDF for exporting reports -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+</head>
+
+<body>
+
+    <!-- Header / Top Bar -->
+    <header class="top-bar">
+        <div class="logo">
+            <img src="logo.png" alt="Frutix Logo" class="logo-img">
+        </div>
+        <div class="header-actions">
+            <button id="theme-toggle" class="icon-btn">
+                <ion-icon name="moon-outline" id="theme-icon"></ion-icon>
+            </button>
+            <div class="bcv-widget">
+                <span>Tasa BCV:</span>
+                <div class="bcv-input-wrapper">
+                    <span class="currency-symbol">Bs</span>
+                    <input type="number" id="bcv-rate" value="45.00" step="0.01">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main id="app-content">
+
+        <!-- DASHBOARD SECTION -->
+        <section id="dashboard" class="page active">
+            <div class="hero-card">
+                <h3>Valor Total Inventario</h3>
+                <div class="big-number" id="total-inventory-usd">$0.00</div>
+                <div class="sub-number" id="total-inventory-bs">Bs 0.00</div>
+            </div>
+
+            <div class="grid-2">
+                <div class="stat-card">
+                    <div class="icon-box green"><ion-icon name="arrow-up"></ion-icon></div>
+                    <span>Ventas Hoy</span>
+                    <h4 id="today-income">$0.00</h4>
+                    <span class="sub-val" id="today-income-bs">Bs 0.00</span>
+                </div>
+                <div class="stat-card">
+                    <div class="icon-box red"><ion-icon name="arrow-down"></ion-icon></div>
+                    <span>Costos Hoy</span>
+                    <h4 id="today-expenses">$0.00</h4>
+                    <span class="sub-val" id="today-expenses-bs">Bs 0.00</span>
+                </div>
+            </div>
+
+            <div class="section-title">
+                <h4>Balance Hoy</h4>
+            </div>
+            <div class="profit-card">
+                <h3 id="net-profit">$0.00</h3>
+                <button class="btn-closure" onclick="window.processDayClosure()">Cerrar Día</button>
+            </div>
+
+            <div class="alert-box hidden" id="low-stock-alert">
+                <ion-icon name="warning"></ion-icon>
+                <span>Hay productos con stock bajo</span>
+            </div>
+        </section>
+
+        <!-- INVENTORY SECTION -->
+        <section id="inventory" class="page">
+            <div class="search-bar">
+                <ion-icon name="search"></ion-icon>
+                <input type="text" id="files-search" placeholder="Buscar productos...">
+            </div>
+
+            <div class="inventory-list" id="inventory-list">
+                <!-- Items will be injected here via JS -->
+                <div class="empty-state">
+                    <ion-icon name="file-tray-outline"></ion-icon>
+                    <p>No hay productos</p>
+                </div>
+            </div>
+
+            <button class="fab" onclick="window.openModal('add-product-modal')">
+                <ion-icon name="add"></ion-icon>
+            </button>
+        </section>
+
+        <!-- MOVEMENTS SECTION -->
+        <section id="movements" class="page">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="window.filterMovements('all')">Todos</button>
+                <button class="tab-btn" onclick="window.filterMovements('in')">Entradas</button>
+                <button class="tab-btn" onclick="window.filterMovements('out')">Salidas</button>
+            </div>
+            <div class="movements-list" id="movements-list">
+                <!-- Movements list -->
+            </div>
+            <button class="fab" onclick="window.openModal('add-movement-modal')">
+                <ion-icon name="swap-vertical"></ion-icon>
+            </button>
+        </section>
+
+        <!-- FINANCES SECTION -->
+        <section id="finances" class="page">
+            <div class="finance-hero">
+                <span>Balance Neto Global</span>
+                <h2 id="finance-balance">$0.00</h2>
+                <span class="sub-hero-val" id="finance-balance-bs">Bs 0.00</span>
+                <div id="finance-status-pill" class="status-pill">Estable</div>
+            </div>
+
+            <div class="grid-2">
+                <div class="finance-mini-card">
+                    <div class="mini-label">Total Ventas</div>
+                    <div class="mini-value text-green" id="finance-total-sales">$0.00</div>
+                    <div class="mini-sub-val" id="finance-total-sales-bs">Bs 0.00</div>
+                </div>
+                <div class="finance-mini-card">
+                    <div class="mini-label">Total Costos</div>
+                    <div class="mini-value text-red" id="finance-total-costs">$0.00</div>
+                    <div class="mini-sub-val" id="finance-total-costs-bs">Bs 0.00</div>
+                </div>
+            </div>
+
+            <div class="finance-analytics">
+                <h4>Distribución de Flujo</h4>
+                <div class="progress-container">
+                    <div class="progress-bar" id="finance-progress-bar" style="width: 0%"></div>
+                </div>
+                <div class="progress-labels">
+                    <span>Inversión</span>
+                    <span>Ganancia Bruta</span>
+                </div>
+            </div>
+
+            <div class="chart-placeholder">
+                <div class="bar-chart" id="simple-chart">
+                    <!-- Simple CSS Bars generated by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- REPORTS SECTION -->
+        <section id="reports" class="page">
+            <div class="report-card">
+                <h4>Tendencia de Ventas (Semana)</h4>
+                <div class="trend-chart" id="trend-chart-container">
+                    <!-- Bars filled by JS -->
+                </div>
+            </div>
+
+            <div class="report-card">
+                <h4>Top Frutas Más Vendidas (Kg)</h4>
+                <ul id="top-products-list">
+                    <!-- List -->
+                </ul>
+            </div>
+        </section>
+
+        <!-- DEBTS SECTION -->
+        <section id="debts" class="page">
+            <div class="section-title">
+                <h4>Cuentas por Cobrar (Fiados)</h4>
+            </div>
+            <div class="debts-list" id="debts-list">
+                <!-- Debts list -->
+            </div>
+        </section>
+
+        <!-- SUPPLIERS SECTION -->
+        <section id="suppliers-view" class="page">
+            <div class="section-title">
+                <h4>Directorio de Proveedores</h4>
+            </div>
+            <div class="suppliers-list" id="suppliers-list">
+                <!-- Suppliers list -->
+            </div>
+            <button class="fab" onclick="window.openModal('add-supplier-modal')">
+                <ion-icon name="business-outline"></ion-icon>
+            </button>
+        </section>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item active" data-target="dashboard">
+            <ion-icon name="grid-outline"></ion-icon>
+            <span>Panel</span>
+        </a>
+        <a href="#" class="nav-item" data-target="inventory">
+            <ion-icon name="list-outline"></ion-icon>
+            <span>Inventario</span>
+        </a>
+        <a href="#" class="nav-item" data-target="movements">
+            <ion-icon name="swap-horizontal-outline"></ion-icon>
+            <span>Movim.</span>
+        </a>
+        <a href="#" class="nav-item" data-target="finances">
+            <ion-icon name="cash-outline"></ion-icon>
+            <span>Finanzas</span>
+        </a>
+        <a href="#" class="nav-item" data-target="reports">
+            <ion-icon name="stats-chart-outline"></ion-icon>
+            <span>Reportes</span>
+        </a>
+        <a href="#" class="nav-item" data-target="debts">
+            <ion-icon name="people-outline"></ion-icon>
+            <span>Deudas</span>
+        </a>
+        <a href="#" class="nav-item" data-target="suppliers-view">
+            <ion-icon name="business-outline"></ion-icon>
+            <span>Proveed.</span>
+        </a>
+    </nav>
+
+    <!-- MODAL: DAY CLOSURE SUMMARY -->
+    <div id="closure-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Cierre de Caja</h3>
+                <span class="close-modal" onclick="window.closeModal('closure-modal')">&times;</span>
+            </div>
+            <div id="closure-results" class="summary-list">
+                <!-- Filled by JS -->
+            </div>
+            <div class="modal-footer-btns">
+                <button class="btn-secondary" onclick="window.exportToPDF()">Exportar PDF</button>
+                <button class="btn-primary" onclick="window.closeModal('closure-modal')">Entendido</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD SUPPLIER -->
+    <div id="add-supplier-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nuevo Proveedor</h3>
+                <span class="close-modal" onclick="window.closeModal('add-supplier-modal')">&times;</span>
+            </div>
+            <form id="add-supplier-form">
+                <div class="form-group">
+                    <label>Nombre del Proveedor</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="tel" name="phone">
+                </div>
+                <div class="form-group">
+                    <label>Productos que entrega</label>
+                    <input type="text" name="products_info" placeholder="Ej: Bananos, Fresas">
+                </div>
+                <button type="submit" class="btn-primary">Guardar Proveedor</button>
+            </form>
+        </div>
+    </div>
+    <div id="add-product-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nuevo Producto</h3>
+                <span class="close-modal" onclick="window.closeModal('add-product-modal')">&times;</span>
+            </div>
+            <form id="add-product-form">
+                <div class="form-group">
+                    <label>Nombre del Producto</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label>Costo por Kg ($)</label>
+                        <input type="number" name="cost" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Precio Venta por Kg ($)</label>
+                        <input type="number" name="price" step="0.01" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Kilos Iniciales (Kg)</label>
+                    <input type="number" name="stock" step="0.1" required>
+                </div>
+                <button type="submit" class="btn-primary">Guardar Producto</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD MOVEMENT -->
+    <div id="add-movement-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Registrar Movimiento</h3>
+                <span class="close-modal" onclick="window.closeModal('add-movement-modal')">&times;</span>
+            </div>
+            <form id="add-movement-form">
+                <div class="form-group">
+                    <label>Tipo Movimiento</label>
+                    <select name="type" id="movement-type" onchange="window.toggleMovementFields()">
+                        <option value="out">Venta (Salida)</option>
+                        <option value="in">Compra/Reposición (Entrada)</option>
+                        <option value="waste">Merma (Desperdicio)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Producto</label>
+                    <select name="product_id" id="movement-product-select" required>
+                        <!-- Options filled by JS -->
+                    </select>
+                </div>
+
+                <div id="extra-fields" style="display:contents">
+                    <div class="form-group" id="payment-method-field">
+                        <label>Método de Pago</label>
+                        <select name="payment_method" id="movement-payment-method">
+                            <option value="cash">Al Contado</option>
+                            <option value="debt">Fiado (A Crédito)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group hidden" id="client-name-field">
+                        <label>Nombre del Cliente</label>
+                        <input type="text" name="client_name" placeholder="Ej: Sr. Manuel">
+                    </div>
+
+                    <div class="form-group hidden" id="supplier-select-field">
+                        <label>Proveedor</label>
+                        <select name="supplier_id" id="movement-supplier-select">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Cantidad (Kg)</label>
+                    <input type="number" name="quantity" min="0.1" step="0.1" required>
+                </div>
+
+                <div id="sale-info" class="info-box">
+                    Precio Venta Unitario: $<span id="info-price">0.00</span><br>
+                    Total a Recibir: $<span id="info-total">0.00</span>
+                </div>
+
+                <button type="submit" class="btn-primary">Registrar</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
