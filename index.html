@@ -18,7 +18,10 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <!-- html2canvas for exporting as PNG -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
+
 
 <body class="auth-mode"> <!-- Start in auth mode -->
 
@@ -270,9 +273,11 @@
                 <!-- Filled by JS -->
             </div>
             <div class="modal-footer-btns">
-                <button class="btn-secondary" onclick="window.exportToPDF()">Exportar PDF</button>
-                <button class="btn-primary" onclick="window.closeModal('closure-modal')">Entendido</button>
+                <button class="btn-secondary" onclick="window.exportToPNG()"
+                    style="background: var(--primary-color);">Exportar PNG</button>
+                <button class="btn-secondary" onclick="window.exportToPDF()">PDF</button>
             </div>
+
         </div>
     </div>
 

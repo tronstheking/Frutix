@@ -112,27 +112,30 @@ body {
 }
 
 /* Sections */
-.page {
-    display: none;
-    padding: 20px;
-    animation: fadeIn 0.3s ease;
-}
-
-.page.active {
-    display: block;
-}
-
-@keyframes fadeIn {
+@keyframes pageEnter {
     from {
         opacity: 0;
-        transform: translateY(5px);
+        transform: scale(0.98) translateY(10px);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: scale(1) translateY(0);
     }
 }
+
+.page {
+    display: none;
+    padding: 20px;
+    animation: pageEnter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: transform, opacity;
+}
+
+.page.active {
+    display: block !important;
+}
+
+
 
 /* Dashboard Cards */
 .hero-card {
@@ -167,13 +170,17 @@ body {
 }
 
 .stat-card {
-    background-color: var(--card-bg);
-    padding: 15px;
-    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 18px;
+    border-radius: 16px;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
+
 
 .icon-box {
     width: 32px;
@@ -196,14 +203,17 @@ body {
 }
 
 .profit-card {
-    background-color: var(--card-bg);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     padding: 20px;
-    border-radius: 12px;
+    border-radius: 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid var(--border-color);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
+
 
 .badge {
     padding: 4px 10px;
@@ -233,15 +243,43 @@ body {
     font-size: 1rem;
 }
 
-.inventory-item {
-    background-color: var(--card-bg);
-    padding: 15px;
-    border-radius: 12px;
-    margin-bottom: 10px;
+@keyframes itemAppear {
+    from {
+        opacity: 0;
+        transform: translateY(15px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.inventory-item,
+.movement-card,
+.debt-card,
+.supplier-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 18px;
+    border-radius: 16px;
+    margin-bottom: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s;
+    animation: itemAppear 0.4s cubic-bezier(0.17, 0.84, 0.44, 1) both;
 }
+
+
+.inventory-item:active {
+    transform: scale(0.98);
+    background: rgba(255, 255, 255, 0.08);
+}
+
 
 .item-info h4 {
     font-size: 1rem;
@@ -439,9 +477,11 @@ body {
 }
 
 .modal-footer-btns {
-    display: flex;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
     gap: 10px;
 }
+
 
 .btn-secondary {
     width: 100%;
@@ -590,17 +630,37 @@ body {
     font-size: 0.7rem;
     gap: 4px;
     width: 20%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-item ion-icon {
     font-size: 1.4rem;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .nav-item.active {
     color: var(--primary-color);
+    transform: translateY(-2px);
 }
 
+.nav-item.active ion-icon {
+    transform: scale(1.2);
+}
+
+
 /* Modal */
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(100%) scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 .modal {
     display: none;
     position: fixed;
@@ -608,13 +668,15 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: 200;
     align-items: center;
     justify-content: center;
     padding: 20px;
     opacity: 0;
-    transition: opacity 0.3s;
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modal.open {
@@ -626,10 +688,19 @@ body {
     background: var(--bg-color);
     width: 100%;
     max-width: 400px;
-    border-radius: 16px;
-    padding: 20px;
-    border: 1px solid var(--border-color);
+    border-radius: 28px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    transform: translateY(20px);
+    transition: transform 0.5s cubic-bezier(0.17, 0.84, 0.44, 1);
 }
+
+.modal.open .modal-content {
+    transform: translateY(0);
+    animation: modalSlideUp 0.5s cubic-bezier(0.17, 0.84, 0.44, 1);
+}
+
 
 .modal-header {
     display: flex;
@@ -774,7 +845,31 @@ body.light-theme select {
 
 /* Ocurtar splash de login al entrar */
 body:not(.auth-mode) .auth-screen {
-    display: none !important;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(1.05);
+}
+
+
+@keyframes orbit {
+    from {
+        transform: rotate(0deg) translateX(100px) rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg) translateX(100px) rotate(-360deg);
+    }
+}
+
+@keyframes orbit2 {
+    from {
+        transform: rotate(360deg) translateX(120px) rotate(-360deg);
+    }
+
+    to {
+        transform: rotate(0deg) translateX(120px) rotate(0deg);
+    }
 }
 
 .auth-screen {
@@ -783,38 +878,155 @@ body:not(.auth-mode) .auth-screen {
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--bg-color);
+    background: #0f172a;
+    /* Deep dark background for glass contrast */
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 20px;
+    transition: all 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    overflow: hidden;
 }
 
+.auth-screen::before,
+.auth-screen::after {
+    content: '';
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: -1;
+    opacity: 0.6;
+}
+
+.auth-screen::before {
+    background: var(--primary-color);
+    top: 20%;
+    left: 20%;
+    animation: orbit 15s linear infinite;
+}
+
+.auth-screen::after {
+    background: var(--accent-color);
+    bottom: 20%;
+    right: 20%;
+    animation: orbit2 20s linear infinite;
+}
+
+
+
 .auth-container {
-    background: var(--card-bg);
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
     width: 100%;
-    max-width: 360px;
-    padding: 30px;
-    border-radius: 20px;
-    border: 1px solid var(--border-color);
+    max-width: 400px;
+    padding: 50px 35px;
+    border-radius: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.82);
     text-align: center;
+    animation: fadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.auth-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.05),
+            transparent);
+    transition: 0.5s;
+    pointer-events: none;
+}
+
+.auth-container:hover::before {
+    left: 100%;
+    transition: 0.7s;
+}
+
+
+
+@keyframes logoEntrance {
+    0% {
+        opacity: 0;
+        transform: scale(0.3) rotate(-20deg);
+        filter: brightness(2) blur(10px);
+    }
+
+    60% {
+        transform: scale(1.1) rotate(5deg);
+        filter: brightness(1.2) blur(0);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+        filter: brightness(1) blur(0);
+    }
+}
+
+@keyframes logoFloat {
+
+    0%,
+    100% {
+        transform: translateY(0);
+        filter: drop-shadow(0 5px 15px rgba(16, 185, 129, 0.2));
+    }
+
+    50% {
+        transform: translateY(-10px);
+        filter: drop-shadow(0 20px 25px rgba(16, 185, 129, 0.4));
+    }
 }
 
 .auth-logo {
-    height: 60px;
-    margin-bottom: 20px;
+    height: 100px;
+    /* Aumentado para mayor impacto */
+    margin-bottom: 30px;
+    animation: logoEntrance 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+        logoFloat 4s ease-in-out infinite 1s;
+    will-change: transform, filter;
+}
+
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .auth-container h2 {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
+    /* Un poco más grande para presencia */
     margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--text-primary) 30%, var(--primary-color) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+
+    animation: fadeInUp 0.8s ease-out 0.4s backwards;
 }
 
 .auth-container p {
     color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin-bottom: 25px;
+    font-size: 0.95rem;
+    margin-bottom: 30px;
+    animation: fadeInUp 0.8s ease-out 0.6s backwards;
 }
 
 .auth-switch {

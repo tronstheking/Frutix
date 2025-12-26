@@ -206,10 +206,37 @@ function renderReports() {
 // Window functions
 window.processDayClosure = () => {
     const t = new Date().toISOString().split('T')[0], m = movements.filter(x => x.date.startsWith(t));
-    const s = m.filter(x => x.type === 'out').reduce((a, b) => a + b.total, 0), c = m.filter(x => x.type === 'in').reduce((a, b) => a + b.total, 0);
-    document.getElementById('closure-results').innerHTML = `<div class="summary-item">Ventas: $${s.toFixed(2)}</div><div class="summary-item">Inversión: $${c.toFixed(2)}</div><hr><div class="summary-item">Ganancia: $${(s - c).toFixed(2)}</div>`;
+    const s = m.filter(x => x.type === 'out').reduce((a, b) => a + b.total, 0);
+    const c = m.filter(x => x.type === 'in').reduce((a, b) => a + b.total, 0);
+    const profit = s - c;
+
+    document.getElementById('closure-results').innerHTML = `
+        <div class="summary-item">
+            <span>Ventas Totales:</span>
+            <div style="text-align:right">
+                <strong>$${s.toFixed(2)}</strong><br>
+                <small class="sub-val">Bs ${(s * bcvRate).toFixed(2)}</small>
+            </div>
+        </div>
+        <div class="summary-item">
+            <span>Inversión/Costos:</span>
+            <div style="text-align:right">
+                <strong>$${c.toFixed(2)}</strong><br>
+                <small class="sub-val">Bs ${(c * bcvRate).toFixed(2)}</small>
+            </div>
+        </div>
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 10px 0;">
+        <div class="summary-item">
+            <span>Ganancia Neta:</span>
+            <div style="text-align:right">
+                <strong style="color: var(--primary-color); font-size: 1.2rem;">$${profit.toFixed(2)}</strong><br>
+                <small class="sub-val" style="font-weight:bold">Bs ${(profit * bcvRate).toFixed(2)}</small>
+            </div>
+        </div>
+    `;
     window.openModal('closure-modal');
 };
+
 
 window.deleteMovement = async (id) => {
     if (!confirm("¿Eliminar movimiento y revertir stock?")) return;
@@ -228,5 +255,38 @@ window.openModal = (id) => {
     document.getElementById(id).classList.add('open');
 };
 window.closeModal = (id) => document.getElementById(id).classList.remove('open');
+window.exportToPNG = async () => {
+    const element = document.getElementById('closure-modal').querySelector('.modal-content');
+    const footer = element.querySelector('.modal-footer-btns');
+
+    // Temporarily hide buttons for capture
+    if (footer) footer.style.display = 'none';
+
+    // Add branding for the image
+    const branding = document.createElement('div');
+    branding.innerHTML = `<h2 style="color:#10B981; margin-bottom:10px;">Frutix Inventory</h2><p style="color:#A0A0A0; font-size:12px; margin-bottom:20px;">Reporte de Cierre - ${new Date().toLocaleDateString()}</p>`;
+    element.prepend(branding);
+
+    try {
+        const canvas = await html2canvas(element, {
+            backgroundColor: '#121212',
+            scale: 2, // Higher quality
+            borderRadius: 16
+        });
+
+        const link = document.createElement('a');
+        link.download = `cierre_frutix_${new Date().toISOString().split('T')[0]}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    } catch (err) {
+        console.error("Error al exportar imagen:", err);
+        alert("No se pudo generar la imagen");
+    } finally {
+        if (footer) footer.style.display = 'flex';
+        branding.remove();
+    }
+};
+
 window.exportToPDF = () => { alert("Exportando a PDF..."); };
+
 function setTxt(id, t) { const e = document.getElementById(id); if (e) e.textContent = t; }
