@@ -1,6 +1,6 @@
-// --- FRUTIX APP LOGIC (FIREBASE SYNC) ---
+// --- FRUTIX APP LOGIC (FIREBASE SYNC - STABLE) ---
 
-// 1. FIREBASE CONFIGURATION (Placeholder - User must update this)
+// 1. FIREBASE CONFIGURATION
 const firebaseConfig = {
     apiKey: "AIzaSyA9xvkUT0L4IBvEH7tpqiZ4CwNYbVvxLq8",
     authDomain: "frutix-app.firebaseapp.com",
@@ -11,12 +11,12 @@ const firebaseConfig = {
     measurementId: "G-JLL6PTNH92"
 };
 
-// Initialize Firebase
+// Initialize Firebase (Compat)
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// 2. STATE MANAGEMENT (Now synced with Firestore)
+// 2. STATE MANAGEMENT
 let products = [];
 let movements = [];
 let debts = [];
@@ -64,7 +64,7 @@ function setupAuthListeners() {
     });
 
     document.getElementById('logout-btn')?.addEventListener('click', () => {
-        auth.signOut();
+        auth.signOut().then(() => window.location.reload());
     });
 }
 
@@ -78,6 +78,8 @@ function setupAuthForm() {
     const errorDiv = document.getElementById('auth-error');
 
     let isRegister = false;
+
+    if (!switchBtn) return;
 
     switchBtn.onclick = (e) => {
         e.preventDefault();
@@ -94,7 +96,10 @@ function setupAuthForm() {
         e.preventDefault();
         const email = document.getElementById('auth-email').value;
         const password = document.getElementById('auth-password').value;
+
         errorDiv.classList.add('hidden');
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Procesando...";
 
         try {
             if (isRegister) {
@@ -103,35 +108,45 @@ function setupAuthForm() {
                 await auth.signInWithEmailAndPassword(email, password);
             }
         } catch (error) {
-            errorDiv.textContent = error.message;
+            console.error("Auth Error:", error);
+            errorDiv.textContent = traduceError(error.code);
             errorDiv.classList.remove('hidden');
+            submitBtn.disabled = false;
+            submitBtn.textContent = isRegister ? "Registrarse" : "Entrar";
         }
     };
+}
+
+function traduceError(code) {
+    switch (code) {
+        case 'auth/user-not-found': return 'El usuario no existe. ¿Ya te registraste?';
+        case 'auth/wrong-password': return 'Contraseña incorrecta.';
+        case 'auth/email-already-in-use': return 'Este correo ya está registrado.';
+        case 'auth/weak-password': return 'La contraseña debe tener al menos 6 caracteres.';
+        case 'auth/invalid-email': return 'El formato del correo no es válido.';
+        default: return 'Ocurrió un error. Verifica tu conexión.';
+    }
 }
 
 // 5. REAL-TIME DATA SYNC
 function setupRealtimeSync() {
     const userDb = db.collection('users').doc(currentUser.uid);
 
-    // Sync Products
     userDb.collection('products').onSnapshot(snapshot => {
         products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderAll();
-    });
+    }, err => console.error("Products Sync Error:", err));
 
-    // Sync Movements
     userDb.collection('movements').orderBy('date', 'desc').limit(200).onSnapshot(snapshot => {
         movements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderAll();
     });
 
-    // Sync Debts
     userDb.collection('debts').onSnapshot(snapshot => {
         debts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderAll();
     });
 
-    // Sync Suppliers
     userDb.collection('suppliers').onSnapshot(snapshot => {
         suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderAll();
@@ -144,9 +159,7 @@ function setupEventListeners() {
     if (searchInput) searchInput.addEventListener('input', (e) => renderInventory(e.target.value));
 
     const addProductForm = document.getElementById('add-product-form');
-    if (addProductForm) {
-        addProductForm.onsubmit = handleAddProduct;
-    }
+    if (addProductForm) addProductForm.onsubmit = handleAddProduct;
 
     const addMovementForm = document.getElementById('add-movement-form');
     if (addMovementForm) {
@@ -266,13 +279,8 @@ function renderMovements(filter = 'all') {
     const list = document.getElementById('movements-list');
     if (!list) return;
     list.innerHTML = '';
-    if (movements.length === 0) {
-        list.innerHTML = `<div class="empty-state"><p>Sin movimientos</p></div>`;
-        return;
-    }
-    let displayed = movements;
-    if (filter !== 'all') displayed = movements.filter(m => m.type === filter);
-
+    if (movements.length === 0) { list.innerHTML = `<div class="empty-state"><p>Sin movimientos</p></div>`; return; }
+    let displayed = filter === 'all' ? movements : movements.filter(m => m.type === filter);
     displayed.forEach(m => {
         const p = products.find(x => x.id == m.productId);
         const name = p ? p.name : 'Desc.';
@@ -310,8 +318,6 @@ function renderFinances() {
     setElText('finance-total-costs-bs', `Bs ${formatCurrency(costs * bcvRate, false)}`);
     setElText('finance-balance', formatCurrency(balance));
     setElText('finance-balance-bs', `Bs ${formatCurrency(balance * bcvRate, false)}`);
-    const pill = document.getElementById('finance-status-pill');
-    if (pill) { pill.textContent = balance >= 0 ? "En Verde" : "Déficit"; pill.className = `status-pill ${balance >= 0 ? 'text-green' : 'text-red'}`; }
 }
 
 function renderDebts() {
@@ -379,21 +385,18 @@ function renderTrendChart() {
     });
 }
 
-// 8. FIRESTORE ACTIONS handlers
+// 8. FIRESTORE ACTIONS
 const getUserCollection = (name) => db.collection('users').doc(currentUser.uid).collection(name);
 
 async function handleAddProduct(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const np = { name: fd.get('name'), cost: parseFloat(fd.get('cost')), price: parseFloat(fd.get('price')), stock: parseFloat(fd.get('stock')) };
-
     try {
         const doc = await getUserCollection('products').add(np);
-        if (np.stock > 0) {
-            await getUserCollection('movements').add({ productId: doc.id, type: 'in', quantity: np.stock, total: np.stock * np.cost, snapshotCost: np.cost, date: new Date().toISOString() });
-        }
+        if (np.stock > 0) await getUserCollection('movements').add({ productId: doc.id, type: 'in', quantity: np.stock, total: np.stock * np.cost, snapshotCost: np.cost, date: new Date().toISOString() });
         closeModal('add-product-modal'); e.target.reset();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { alert(err.message); }
 }
 
 async function handleAddMovement(e) {
@@ -403,19 +406,12 @@ async function handleAddMovement(e) {
     const pid = fd.get('product_id');
     const qty = parseFloat(fd.get('quantity'));
     const p = products.find(x => x.id == pid);
-    if (!p) return;
-    if (type !== 'in' && p.stock < qty) return alert("Stock insuficiente");
-
-    const newStock = p.stock + (type === 'in' ? qty : -qty);
-    const total = type === 'out' ? qty * p.price : qty * p.cost;
-    const move = { productId: pid, type: type, quantity: qty, total: total, snapshotCost: p.cost, date: new Date().toISOString(), paymentMethod: fd.get('payment_method') };
+    if (!p || (type !== 'in' && p.stock < qty)) return alert("Stock insuficiente");
 
     try {
-        await getUserCollection('movements').add(move);
-        await getUserCollection('products').doc(pid).update({ stock: newStock });
-        if (type === 'out' && fd.get('payment_method') === 'debt') {
-            await getUserCollection('debts').add({ clientName: fd.get('client_name') || 'Anónimo', amount: total, date: new Date().toISOString(), paid: false });
-        }
+        await getUserCollection('movements').add({ productId: pid, type, quantity: qty, total: type === 'out' ? qty * p.price : qty * p.cost, snapshotCost: p.cost, date: new Date().toISOString(), paymentMethod: fd.get('payment_method') });
+        await getUserCollection('products').doc(pid).update({ stock: p.stock + (type === 'in' ? qty : -qty) });
+        if (type === 'out' && fd.get('payment_method') === 'debt') await getUserCollection('debts').add({ clientName: fd.get('client_name') || 'Anónimo', amount: qty * p.price, date: new Date().toISOString(), paid: false });
         closeModal('add-movement-modal'); e.target.reset();
     } catch (err) { alert(err.message); }
 }
@@ -430,63 +426,57 @@ async function handleAddSupplier(e) {
 }
 
 // 9. WINDOW FUNCTIONS (GLOBAL)
-window.deleteProduct = async (id) => { if (confirm("¿Eliminar producto?")) await getUserCollection('products').doc(id).delete(); };
-window.deleteMovement = async (id) => {
+window.deleteProduct = id => confirm("¿Eliminar?") && getUserCollection('products').doc(id).delete();
+window.deleteMovement = async id => {
     const m = movements.find(x => x.id == id);
-    if (!m) return;
-    if (confirm("¿Eliminar movimiento y revertir stock?")) {
-        const p = products.find(x => x.id == m.productId);
-        if (p) {
-            const revertStock = p.stock + (m.type === 'in' ? -m.quantity : m.quantity);
-            await getUserCollection('products').doc(p.id).update({ stock: revertStock });
-        }
-        await getUserCollection('movements').doc(id).delete();
-    }
+    if (!m || !confirm("¿Eliminar?")) return;
+    const p = products.find(x => x.id == m.productId);
+    if (p) await getUserCollection('products').doc(p.id).update({ stock: p.stock + (m.type === 'in' ? -m.quantity : m.quantity) });
+    await getUserCollection('movements').doc(id).delete();
 };
-window.deleteDebt = async (id) => { if (confirm("¿Eliminar deuda?")) await getUserCollection('debts').doc(id).delete(); };
-window.deleteSupplier = async (id) => { if (confirm("¿Eliminar proveedor?")) await getUserCollection('suppliers').doc(id).delete(); };
-window.payDebt = async (id) => { await getUserCollection('debts').doc(id).update({ paid: true }); };
+window.deleteDebt = id => confirm("¿Eliminar?") && getUserCollection('debts').doc(id).delete();
+window.deleteSupplier = id => confirm("¿Eliminar?") && getUserCollection('suppliers').doc(id).delete();
+window.payDebt = id => getUserCollection('debts').doc(id).update({ paid: true });
 
-window.openModal = (id) => { if (id === 'add-movement-modal') populateProductSelect(); const m = document.getElementById(id); if (m) m.classList.add('open'); };
-window.closeModal = (id) => { const m = document.getElementById(id); if (m) m.classList.remove('open'); };
-window.filterMovements = (type) => renderMovements(type);
+window.openModal = id => { if (id === 'add-movement-modal') populateProductSelect(); document.getElementById(id)?.classList.add('open'); };
+window.closeModal = id => document.getElementById(id)?.classList.remove('open');
+window.filterMovements = type => renderMovements(type);
 
 window.toggleMovementFields = () => {
     const type = document.getElementById('movement-type')?.value;
-    const client = document.getElementById('client-name-field');
-    const pay = document.getElementById('payment-method-field');
-    const supp = document.getElementById('supplier-select-field');
-    if (type === 'out') { pay?.classList.remove('hidden'); supp?.classList.add('hidden'); window.togglePaymentMethod(); }
-    else if (type === 'in') { pay?.classList.add('hidden'); client?.classList.add('hidden'); supp?.classList.remove('hidden'); populateSupplierSelect(); }
-    else { [pay, client, supp].forEach(el => el?.classList.add('hidden')); }
+    const c = document.getElementById('client-name-field'), p = document.getElementById('payment-method-field'), s = document.getElementById('supplier-select-field');
+    if (type === 'out') { p?.classList.remove('hidden'); s?.classList.add('hidden'); window.togglePaymentMethod(); }
+    else if (type === 'in') { p?.classList.add('hidden'); c?.classList.add('hidden'); s?.classList.remove('hidden'); populateSupplierSelect(); }
+    else[c, p, s].forEach(el => el?.classList.add('hidden'));
 };
 
 window.togglePaymentMethod = () => {
     const method = document.getElementById('movement-payment-method')?.value;
     const client = document.getElementById('client-name-field');
-    if (client) { if (method === 'debt') client.classList.remove('hidden'); else client.classList.add('hidden'); }
+    if (client) method === 'debt' ? client.classList.remove('hidden') : client.classList.add('hidden');
 };
 
 window.processDayClosure = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const tMovs = movements.filter(m => m.date.startsWith(today));
-    const sales = tMovs.filter(m => m.type === 'out').reduce((acc, m) => acc + m.total, 0);
-    const costs = tMovs.filter(m => m.type === 'in').reduce((acc, m) => acc + m.total, 0);
-    const waste = tMovs.filter(m => m.type === 'waste').reduce((acc, m) => acc + m.total, 0);
+    const t = new Date().toISOString().split('T')[0], m = movements.filter(x => x.date.startsWith(t));
+    const s = m.filter(x => x.type === 'out').reduce((a, b) => a + b.total, 0), c = m.filter(x => x.type === 'in').reduce((a, b) => a + b.total, 0), w = m.filter(x => x.type === 'waste').reduce((a, b) => a + b.total, 0);
     const res = document.getElementById('closure-results');
-    if (res) { res.innerHTML = `<div class="summary-item"><span>Ventas</span> <strong>$${sales.toFixed(2)}</strong></div><div class="summary-item"><span>Inversión</span> <strong>$${costs.toFixed(2)}</strong></div><div class="summary-item"><span>Merma</span> <strong class="text-red">$${waste.toFixed(2)}</strong></div><hr><div class="summary-item"><span>Balance</span> <strong>$${(sales - costs - waste).toFixed(2)}</strong></div>`; }
+    if (res) res.innerHTML = `<div class="summary-item">Ventas: $${s.toFixed(2)}</div><div class="summary-item">Inversión: $${c.toFixed(2)}</div><div class="summary-item text-red">Merma: $${w.toFixed(2)}</div><hr><div class="summary-item">Balance: $${(s - c - w).toFixed(2)}</div>`;
     window.openModal('closure-modal');
+};
+
+window.exportToPDF = () => {
+    const { jsPDF } = window.jspdf; const doc = new jsPDF();
+    doc.text("Reporte Frutix", 20, 20); doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 30);
+    doc.save("Reporte_Frutix.pdf");
 };
 
 // UTILS
 function setElText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
 function formatCurrency(n, isUSD = true) { return (isUSD ? '$' : '') + n.toLocaleString(isUSD ? 'en-US' : 'es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function updateMovementInfo() {
-    const type = document.getElementById('movement-type')?.value;
-    const pid = document.getElementById('movement-product-select')?.value;
-    const qty = parseFloat(document.querySelector('#add-movement-form input[name="quantity"]')?.value) || 0;
-    const p = products.find(x => x.id == pid);
-    if (p) { const up = type === 'out' ? p.price : p.cost; setElText('info-price', up.toFixed(2)); setElText('info-total', (up * qty).toFixed(2)); }
+    const t = document.getElementById('movement-type')?.value, pid = document.getElementById('movement-product-select')?.value;
+    const q = parseFloat(document.querySelector('#add-movement-form input[name="quantity"]')?.value) || 0, p = products.find(x => x.id == pid);
+    if (p) { const up = t === 'out' ? p.price : p.cost; setElText('info-price', up.toFixed(2)); setElText('info-total', (up * q).toFixed(2)); }
 }
 function populateProductSelect() {
     const s = document.getElementById('movement-product-select');
