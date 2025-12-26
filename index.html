@@ -14,9 +14,39 @@
     <!-- jsPDF for exporting reports -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <!-- Firebase SDK (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 </head>
 
-<body>
+<body class="auth-mode"> <!-- Start in auth mode -->
+
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-container">
+            <img src="logo.png" alt="Frutix Logo" class="auth-logo">
+            <h2 id="auth-title">Bienvenido a Frutix</h2>
+            <p id="auth-subtitle">Sincroniza tu negocio en la nube</p>
+
+            <form id="auth-form">
+                <div class="form-group">
+                    <input type="email" id="auth-email" placeholder="Correo electrónico" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="auth-password" placeholder="Contraseña" required>
+                </div>
+                <button type="submit" id="auth-submit" class="btn-primary">Entrar</button>
+            </form>
+
+            <div class="auth-switch">
+                <span id="switch-text">¿No tienes cuenta?</span>
+                <a href="#" id="switch-auth">Regístrate</a>
+            </div>
+
+            <div id="auth-error" class="auth-error hidden"></div>
+        </div>
+    </div>
 
     <!-- Header / Top Bar -->
     <header class="top-bar">
@@ -24,6 +54,9 @@
             <img src="logo.png" alt="Frutix Logo" class="logo-img">
         </div>
         <div class="header-actions">
+            <button id="logout-btn" class="icon-btn" title="Cerrar Sesión" style="margin-right: 10px;">
+                <ion-icon name="log-out-outline"></ion-icon>
+            </button>
             <button id="theme-toggle" class="icon-btn">
                 <ion-icon name="moon-outline" id="theme-icon"></ion-icon>
             </button>
