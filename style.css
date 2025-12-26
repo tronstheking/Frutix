@@ -772,6 +772,11 @@ body.light-theme select {
     display: none !important;
 }
 
+/* Ocurtar splash de login al entrar */
+body:not(.auth-mode) .auth-screen {
+    display: none !important;
+}
+
 .auth-screen {
     position: fixed;
     top: 0;

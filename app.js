@@ -1,9 +1,4 @@
-// --- FRUTIX CLOUD DIAGNÓSTICO ---
-
-// Monitoreo de errores globales
-window.onerror = function(msg, url, line) {
-    alert("JS ERROR: " + msg + "\nLugar: " + line);
-};
+// --- FRUTIX CLOUD FINAL (STABLE) ---
 
 const firebaseConfig = {
     apiKey: "AIzaSyA9xvkUT0L4IBvEH7tpqiZ4CwNYbVvxLq8",
@@ -15,7 +10,7 @@ const firebaseConfig = {
     measurementId: "G-JLL6PTNH92"
 };
 
-// Inicializar
+// Initialize
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -23,14 +18,13 @@ const db = firebase.firestore();
 let products = [], movements = [], debts = [], suppliers = [], bcvRate = 45.0, currentUser = null;
 
 window.onload = () => {
-    // Aplicar tema
+    // Apply Theme
     if (localStorage.getItem('theme') === 'light') document.body.classList.add('light-theme');
 
-    // Escuchar Auth
+    // Auth Listener
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
-            alert("¡CONEXIÓN EXITOSA! Bienvenido.");
             document.body.classList.remove('auth-mode');
             initApp();
         } else {
@@ -42,12 +36,14 @@ window.onload = () => {
     const form = document.getElementById('auth-form');
     let isReg = false;
 
-    // Cambio de modo
+    // Toggle Mode
     document.getElementById('switch-auth').onclick = (e) => {
         e.preventDefault();
         isReg = !isReg;
         document.getElementById('auth-title').innerText = isReg ? "Crear Cuenta" : "Entrar a Frutix";
         document.getElementById('auth-submit').innerText = isReg ? "REGISTRARME" : "ENTRAR";
+        document.getElementById('switch-text').innerText = isReg ? "¿Ya tienes cuenta?" : "¿No tienes cuenta?";
+        document.getElementById('switch-auth').innerText = isReg ? "Entra aquí" : "Regístrate";
     };
 
     form.onsubmit = async (e) => {
@@ -57,7 +53,7 @@ window.onload = () => {
         const btn = document.getElementById('auth-submit');
 
         btn.disabled = true;
-        btn.innerText = "PROBANDO CONEXIÓN...";
+        btn.innerText = "PROCESANDO...";
 
         try {
             if (isReg) {
@@ -66,7 +62,7 @@ window.onload = () => {
                 await auth.signInWithEmailAndPassword(email, pass);
             }
         } catch (err) {
-            alert("ATENCIÓN: " + err.message + "\nCódigo: " + err.code);
+            alert("Error: " + err.message);
             btn.disabled = false;
             btn.innerText = isReg ? "REGISTRARME" : "ENTRAR";
         }
@@ -74,34 +70,89 @@ window.onload = () => {
 };
 
 function initApp() {
-    // Cargar datos
     const userRef = db.collection('users').doc(currentUser.uid);
-    userRef.collection('products').onSnapshot(s => { products = s.docs.map(d=>({id:d.id, ...d.data()})); render(); });
-    
-    // Al salir
-    document.getElementById('logout-btn').onclick = () => {
-        auth.signOut().then(() => window.location.reload());
+
+    // Sync Data
+    userRef.collection('products').onSnapshot(s => { products = s.docs.map(d => ({ id: d.id, ...d.data() })); render(); });
+    userRef.collection('movements').orderBy('date', 'desc').limit(50).onSnapshot(s => { movements = s.docs.map(d => ({ id: d.id, ...d.data() })); render(); });
+    userRef.collection('debts').onSnapshot(s => { debts = s.docs.map(d => ({ id: d.id, ...d.data() })); render(); });
+    userRef.collection('suppliers').onSnapshot(s => { suppliers = s.docs.map(d => ({ id: d.id, ...d.data() })); render(); });
+
+    // UI Navigation
+    document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => {
+        document.querySelectorAll('.nav-item, .page').forEach(el => el.classList.remove('active'));
+        document.getElementById(b.dataset.target).classList.add('active');
+        b.classList.add('active');
+    });
+
+    // Theme & Logout
+    document.getElementById('logout-btn').onclick = () => auth.signOut().then(() => window.location.reload());
+    document.getElementById('theme-toggle').onclick = () => {
+        const L = document.body.classList.toggle('light-theme');
+        localStorage.setItem('theme', L ? 'light' : 'dark');
+        document.getElementById('theme-icon').name = L ? 'sunny-outline' : 'moon-outline';
+    };
+
+    // BCV Rate
+    const bcvInput = document.getElementById('bcv-rate');
+    bcvRate = parseFloat(localStorage.getItem('bcvRate')) || 45.00;
+    bcvInput.value = bcvRate;
+    bcvInput.onchange = (e) => {
+        bcvRate = parseFloat(e.target.value) || 0;
+        localStorage.setItem('bcvRate', bcvRate);
+        render();
+    };
+
+    // Form Handlers
+    document.getElementById('add-product-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const data = { name: fd.get('name'), cost: parseFloat(fd.get('cost')), price: parseFloat(fd.get('price')), stock: parseFloat(fd.get('stock')) };
+        const d = await userRef.collection('products').add(data);
+        if (data.stock > 0) {
+            await userRef.collection('movements').add({
+                productId: d.id, type: 'in', quantity: data.stock, total: data.stock * data.cost, date: new Date().toISOString()
+            });
+        }
+        window.closeModal('add-product-modal'); e.target.reset();
     };
 }
 
 function render() {
-    const totalV = products.reduce((a, b) => a + (b.cost * b.stock), 0);
-    document.getElementById('total-inventory-usd').innerText = `$${totalV.toFixed(2)}`;
-    
-    const inv = document.getElementById('inventory-list');
-    if(inv) inv.innerHTML = products.map(p => `
-        <div class="inventory-item">
-            <div><h4>${p.name}</h4><small>$${p.price}</small></div>
-            <div class="actions-row">
-                <strong>${p.stock.toFixed(1)} Kg</strong>
-                <button class="btn-delete" onclick="deleteItem('products','${p.id}')">
-                    <ion-icon name="trash"></ion-icon>
-                </button>
+    // Total Inventory Value
+    const totalUSD = products.reduce((a, b) => a + (b.cost * b.stock), 0);
+    setTxt('total-inventory-usd', `$${totalUSD.toFixed(2)}`);
+    setTxt('total-inventory-bs', `Bs ${(totalUSD * bcvRate).toFixed(2)}`);
+
+    // Today's stats
+    const today = new Date().toISOString().split('T')[0];
+    const todayMovs = movements.filter(m => m.date.startsWith(today));
+    const salesToday = todayMovs.filter(m => m.type === 'out').reduce((a, b) => a + b.total, 0);
+    const costsToday = todayMovs.filter(m => m.type === 'in').reduce((a, b) => a + b.total, 0);
+    setTxt('today-income', `$${salesToday.toFixed(2)}`);
+    setTxt('today-income-bs', `Bs ${(salesToday * bcvRate).toFixed(2)}`);
+    setTxt('today-expenses', `$${costsToday.toFixed(2)}`);
+    setTxt('today-expenses-bs', `Bs ${(costsToday * bcvRate).toFixed(2)}`);
+    setTxt('net-profit', `$${(salesToday - costsToday).toFixed(2)}`);
+
+    // Inventory List
+    const invList = document.getElementById('inventory-list');
+    if (invList) {
+        invList.innerHTML = products.map(p => `
+            <div class="inventory-item">
+                <div class="item-info"><h4>${p.name}</h4><small>V: $${p.price}</small></div>
+                <div class="actions-row">
+                    <div style="text-align:right"><strong>${p.stock.toFixed(1)}</strong><br><small>Kg</small></div>
+                    <button class="btn-delete" onclick="deleteItem('products', '${p.id}')">
+                        <ion-icon name="trash-outline"></ion-icon>
+                    </button>
+                </div>
             </div>
-        </div>
-    `).join("") || '<p class="empty-state">No hay productos</p>';
+        `).join("") || '<div class="empty-state"><p>No hay productos</p></div>';
+    }
 }
 
-window.deleteItem = (c, id) => confirm("¿Eliminar?") && db.collection('users').doc(currentUser.uid).collection(c).doc(id).delete();
-window.openModal = (id) => document.getElementById(id).classList.add('open');
-window.closeModal = (id) => document.getElementById(id).classList.remove('open');
+window.deleteItem = (col, id) => confirm("¿Eliminar?") && db.collection('users').doc(currentUser.uid).collection(col).doc(id).delete();
+window.openModal = (id) => document.getElementById(id)?.classList.add('open');
+window.closeModal = (id) => document.getElementById(id)?.classList.remove('open');
+function setTxt(id, t) { const e = document.getElementById(id); if (e) e.textContent = t; }
