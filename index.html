@@ -68,6 +68,20 @@
         <div class="logo">
             <img src="logo.png" alt="Frutix Logo" class="logo-img">
         </div>
+        <nav class="top-nav">
+            <a href="#" class="nav-item-top" data-target="catalog">
+                <ion-icon name="book-outline"></ion-icon>
+                <span>Catálogo</span>
+            </a>
+            <a href="#" class="nav-item-top" data-target="clients-view">
+                <ion-icon name="people-outline"></ion-icon>
+                <span>Clientes</span>
+            </a>
+            <a href="#" class="nav-item-top" data-target="orders-view">
+                <ion-icon name="basket-outline"></ion-icon>
+                <span>Pedidos</span>
+            </a>
+        </nav>
         <div class="header-actions">
             <button id="logout-btn" class="icon-btn" title="Cerrar Sesión" style="margin-right: 10px;">
                 <ion-icon name="log-out-outline"></ion-icon>
@@ -76,8 +90,9 @@
                 <ion-icon name="moon-outline" id="theme-icon"></ion-icon>
             </button>
             <div class="bcv-widget">
-                <span>Tasa BCV:</span>
+                <div id="sync-status" class="sync-indicator online" title="Conectado"></div>
                 <div class="bcv-input-wrapper">
+                    <img src="bcv-logo.png" alt="BCV" class="bcv-logo">
                     <span class="currency-symbol">Bs</span>
                     <input type="number" id="bcv-rate" value="45.00" step="0.01">
                 </div>
@@ -260,9 +275,15 @@
 
         <!-- CATALOG SECTION (CUSTOMER VIEW) -->
         <section id="catalog" class="page">
-            <div class="section-title">
-                <h4>Catálogo de Productos</h4>
-                <p style="font-size:0.8rem; color:var(--text-secondary);">Precios vigentes al día de hoy</p>
+            <div class="section-title" style="display: flex; justify-content: space-between; align-items: start;">
+                <div>
+                    <h4>Catálogo de Productos</h4>
+                    <p style="font-size:0.8rem; color:var(--text-secondary);">Precios vigentes al día de hoy</p>
+                </div>
+                <button class="icon-btn" onclick="window.shareCatalog()"
+                    style="color: #25D366; background: rgba(37, 211, 102, 0.1);">
+                    <ion-icon name="share-social-outline"></ion-icon>
+                </button>
             </div>
 
             <div class="catalog-grid" id="catalog-list">
@@ -331,18 +352,6 @@
         <a href="#" class="nav-item" data-target="suppliers-view">
             <ion-icon name="business-outline"></ion-icon>
             <span>Proveed.</span>
-        </a>
-        <a href="#" class="nav-item" data-target="catalog">
-            <ion-icon name="book-outline"></ion-icon>
-            <span>Catálogo</span>
-        </a>
-        <a href="#" class="nav-item" data-target="clients-view">
-            <ion-icon name="people-outline"></ion-icon>
-            <span>Clientes</span>
-        </a>
-        <a href="#" class="nav-item" data-target="orders-view">
-            <ion-icon name="basket-outline"></ion-icon>
-            <span>Pedidos</span>
         </a>
     </nav>
 
@@ -427,10 +436,19 @@
                         <label>Kilos Iniciales (Kg)</label>
                         <input type="number" name="stock" step="0.1" required>
                     </div>
+                </div>
+
+                <div class="form-group-row">
                     <div class="form-group">
                         <label>Imagen del Producto</label>
                         <input type="file" name="image" accept="image/*" id="product-image-input"
                             style="font-size: 0.8rem; padding: 10px;">
+                    </div>
+                    <div class="form-group"
+                        style="flex-direction: row; align-items: center; gap: 10px; margin-top: 20px;">
+                        <input type="checkbox" name="in_catalog" id="in-catalog-check" checked
+                            style="width: 20px; height: 20px;">
+                        <label for="in-catalog-check">Mostrar en Catálogo</label>
                     </div>
                 </div>
                 <button type="submit" class="btn-primary">Guardar Producto</button>
@@ -518,10 +536,18 @@
                     </div>
                 </div>
 
+                <div class="form-group" id="sale-mode-field">
+                    <label>Modo de Venta</label>
+                    <select id="movement-sale-mode" onchange="window.updateMovInfo()">
+                        <option value="weight">Por Peso (Kg)</option>
+                        <option value="amount">Por Monto ($)</option>
+                    </select>
+                </div>
+
                 <div class="form-group-row" style="display: flex; gap: 10px;">
                     <div class="form-group" style="flex: 1;">
-                        <label>Cantidad (Kg)</label>
-                        <input type="number" name="quantity" id="mov-qty" min="0.1" step="0.1" required
+                        <label id="quantity-label">Cantidad (Kg)</label>
+                        <input type="number" name="quantity" id="mov-qty" min="0.01" step="0.01" required
                             oninput="window.updateMovInfo()">
                     </div>
                     <div class="form-group hidden" id="discount-field" style="flex: 1;">
@@ -563,6 +589,39 @@
             </button>
         </div>
     </div>
+    <!-- MODAL: MARKETING STATUS GENERATOR -->
+    <div id="status-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Generar Estado</h3>
+                <span class="close-modal" onclick="window.closeModal('status-modal')"><ion-icon
+                        name="close-outline"></ion-icon></span>
+            </div>
+
+            <div id="marketing-card-container" style="padding: 10px; display: flex; justify-content: center;">
+                <div id="marketing-card" class="marketing-card">
+                    <div class="marketing-badge">OFERTA DEL DÍA</div>
+                    <img id="marketing-img" src="" alt="Producto">
+                    <div class="marketing-content">
+                        <h2 id="marketing-name">Nombre Producto</h2>
+                        <div class="marketing-prices">
+                            <span class="m-price-usd" id="marketing-price-usd">$0.00</span>
+                            <span class="m-price-bs" id="marketing-price-bs">Bs 0.00</span>
+                        </div>
+                        <div class="marketing-footer">
+                            <img src="logo.png" class="m-logo">
+                            <span>Frutix Inventory</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-primary btn-green" onclick="window.downloadMarketingCard()">
+                <ion-icon name="download-outline"></ion-icon> Descargar para WhatsApp
+            </button>
+        </div>
+    </div>
+
     <!-- MODAL: ADD CLIENT -->
     <div id="add-client-modal" class="modal">
         <div class="modal-content">

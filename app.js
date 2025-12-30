@@ -14,6 +14,12 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+// ENABLE OFFLINE PERSISTENCE
+db.enablePersistence().catch(err => {
+    if (err.code === 'failed-precondition') console.warn("Persistence failed: Multiple tabs open");
+    else if (err.code === 'unimplemented') console.warn("Persistence not supported by browser");
+});
+
 let products = [], movements = [], debts = [], suppliers = [], clients = [], orders = [], bcvRate = 45.0, currentUser = null;
 let salesChart = null, productsChart = null, currentMovFilter = 'all';
 
@@ -82,7 +88,9 @@ function startSync() {
     const userRef = db.collection('users').doc(currentUser.uid);
     userRef.collection('settings').doc('global').onSnapshot(doc => {
         if (doc.exists) {
-            bcvRate = doc.data().bcvRate || 45.0;
+            const data = doc.data();
+            bcvRate = data.bcvRate || 45.0;
+            window.publicCatalogUrl = data.publicCatalogUrl || '';
             const bcvInput = document.getElementById('bcv-rate');
             if (bcvInput) bcvInput.value = bcvRate;
             renderAll();
@@ -94,14 +102,26 @@ function startSync() {
     userRef.collection('suppliers').onSnapshot(s => { suppliers = s.docs.map(d => ({ id: d.id, ...d.data() })); renderAll(); });
     userRef.collection('clients').onSnapshot(s => { clients = s.docs.map(d => ({ id: d.id, ...d.data() })); renderAll(); });
     userRef.collection('orders').orderBy('date', 'desc').onSnapshot(s => { orders = s.docs.map(d => ({ id: d.id, ...d.data() })); renderAll(); });
+
+    // Sync Status Indicator
+    const syncIndicator = document.getElementById('sync-status');
+    db.collection('.info').doc('connected').onSnapshot(() => {
+        if (navigator.onLine) {
+            syncIndicator.className = 'sync-indicator online';
+            syncIndicator.title = 'Conectado';
+        } else {
+            syncIndicator.className = 'sync-indicator offline';
+            syncIndicator.title = 'Trabajando sin conexión';
+        }
+    });
 }
 
 function initApp() {
     const userRef = db.collection('users').doc(currentUser.uid);
-    document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => {
-        document.querySelectorAll('.nav-item, .page').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item, .nav-item-top').forEach(b => b.onclick = () => {
+        document.querySelectorAll('.nav-item, .nav-item-top, .page').forEach(el => el.classList.remove('active'));
         document.getElementById(b.dataset.target).classList.add('active');
-        b.classList.add('active');
+        document.querySelectorAll(`[data-target="${b.dataset.target}"]`).forEach(el => el.classList.add('active'));
     });
 
     document.getElementById('logout-btn').onclick = () => auth.signOut().then(() => window.location.reload());
@@ -133,7 +153,8 @@ function initApp() {
             cost: parseFloat(fd.get('cost')),
             price: parseFloat(fd.get('price')),
             stock: parseFloat(fd.get('stock')),
-            imageUrl: imageUrl
+            imageUrl: imageUrl,
+            inCatalog: document.getElementById('in-catalog-check').checked
         };
         const d = await userRef.collection('products').add(data);
         if (data.stock > 0) await userRef.collection('movements').add({ productId: d.id, type: 'in', quantity: data.stock, total: data.stock * data.cost, date: new Date().toISOString() });
@@ -168,7 +189,16 @@ function initApp() {
     document.getElementById('add-movement-form').onsubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
-        const type = fd.get('type'), pid = fd.get('product_id'), qty = parseFloat(fd.get('quantity'));
+        const type = fd.get('type'), pid = fd.get('product_id');
+        let qty = parseFloat(fd.get('quantity'));
+        const saleMode = document.getElementById('movement-sale-mode').value;
+
+        const p = products.find(x => x.id === pid);
+        if (p && type === 'out' && saleMode === 'amount') {
+            // Calculate quantity from dollar amount: qty = $ / price
+            const amountInDollars = qty;
+            qty = amountInDollars / p.price;
+        }
 
         let total = 0;
         let dataToSave = {
@@ -295,7 +325,10 @@ function renderInventory() {
                 </div>
                 <div class="actions-row">
                     <div style="text-align:right">
-                        <strong style="color:var(--primary-color);">${p.stock.toFixed(1)} Kg</strong>
+                        <strong style="color:var(--primary-color);">${p.stock.toFixed(1)} Kg</strong><br>
+                        <button class="icon-btn" onclick="window.generateMarketingCard('${p.id}')" style="color:var(--primary-color); padding:0; margin-top:5px;" title="Crear Estado">
+                            <ion-icon name="share-social-outline"></ion-icon>
+                        </button>
                     </div>
                     <button class="btn-delete" onclick="deleteItem('products', '${p.id}')"><ion-icon name="trash-outline"></ion-icon></button>
                 </div>
@@ -465,7 +498,10 @@ function renderCatalog() {
     const list = document.getElementById('catalog-list');
     if (!list) return;
 
-    list.innerHTML = products.map(p => {
+    // Filter only products marked to be in catalog
+    const catalogProducts = products.filter(p => p.inCatalog !== false); // Default to true if field doesn't exist
+
+    list.innerHTML = catalogProducts.map(p => {
         const imgHtml = p.imageUrl ? `<img src="${p.imageUrl}" class="catalog-img">` : `<div class="catalog-img-placeholder"><ion-icon name="image-outline"></ion-icon></div>`;
         const priceBs = (p.price * bcvRate).toFixed(2);
         const waText = encodeURIComponent(`Hola! Me interesa el producto: ${p.name}. ¿Sigue disponible?`);
@@ -728,6 +764,7 @@ window.toggleMovementFields = () => {
     if (type === 'out') {
         payMethodField.classList.remove('hidden');
         document.getElementById('discount-field').classList.remove('hidden');
+        document.getElementById('sale-mode-field').classList.remove('hidden');
         if (payMethod === 'debt') {
             clientNameField.classList.remove('hidden');
             clientPhoneField.classList.remove('hidden');
@@ -737,12 +774,14 @@ window.toggleMovementFields = () => {
     } else if (type === 'in') {
         supplierField.classList.remove('hidden');
         document.getElementById('discount-field').classList.add('hidden');
+        document.getElementById('sale-mode-field').classList.add('hidden');
     } else if (type === 'expense') {
         prodField.classList.add('hidden');
         document.getElementById('expense-category-field').classList.remove('hidden');
         reasonField.classList.remove('hidden');
         paymentTypeField.classList.remove('hidden');
         document.getElementById('discount-field').classList.add('hidden');
+        document.getElementById('sale-mode-field').classList.add('hidden');
     }
     window.updateMovInfo();
 };
@@ -750,26 +789,56 @@ window.toggleMovementFields = () => {
 window.updateMovInfo = () => {
     const type = document.getElementById('movement-type').value;
     const pid = document.getElementById('movement-product-select').value;
-    const qty = parseFloat(document.getElementById('mov-qty').value) || 0;
+    const saleMode = document.getElementById('movement-sale-mode').value;
+    const qtyVal = parseFloat(document.getElementById('mov-qty').value) || 0;
     const discount = parseFloat(document.getElementById('mov-discount').value) || 0;
+
+    const qtyLabel = document.getElementById('quantity-label');
+    qtyLabel.textContent = (type === 'out' && saleMode === 'amount') ? 'Monto a Vender ($)' : 'Cantidad (Kg)';
 
     const p = products.find(x => x.id === pid);
     const infoBox = document.getElementById('sale-info');
 
     if (type === 'out' && p) {
         infoBox.style.display = 'block';
-        const subtotal = qty * p.price;
-        const total = subtotal - discount;
-        document.getElementById('info-price').textContent = p.price.toFixed(2);
-        document.getElementById('info-total').textContent = total.toFixed(2);
+        let subtotal, calculatedKg;
+
+        if (saleMode === 'amount') {
+            calculatedKg = qtyVal / p.price;
+            subtotal = qtyVal;
+            infoBox.innerHTML = `Peso Calculado: <strong>${calculatedKg.toFixed(3)} Kg</strong><br>Total a Recibir: $${(subtotal - discount).toFixed(2)}`;
+        } else {
+            subtotal = qtyVal * p.price;
+            infoBox.innerHTML = `Precio Venta Unitario: $${p.price.toFixed(2)}<br>Total a Recibir: $${(subtotal - discount).toFixed(2)}`;
+        }
     } else if (type === 'in' && p) {
         infoBox.style.display = 'block';
-        const total = qty * p.cost;
-        document.getElementById('info-price').textContent = p.cost.toFixed(2);
-        document.getElementById('info-total').textContent = total.toFixed(2);
+        const total = qtyVal * p.cost;
+        infoBox.innerHTML = `Costo Unitario: $${p.cost.toFixed(2)}<br>Total a Pagar: $${total.toFixed(2)}`;
     } else {
         infoBox.style.display = 'none';
     }
+};
+
+window.generateMarketingCard = (id) => {
+    const p = products.find(x => x.id === id);
+    if (!p) return;
+
+    document.getElementById('marketing-img').src = p.imageUrl || 'logo.png';
+    document.getElementById('marketing-name').textContent = p.name;
+    document.getElementById('marketing-price-usd').textContent = `$${p.price.toFixed(2)}`;
+    document.getElementById('marketing-price-bs').textContent = `Bs ${(p.price * bcvRate).toFixed(2)}`;
+
+    window.openModal('status-modal');
+};
+
+window.downloadMarketingCard = async () => {
+    const card = document.getElementById('marketing-card');
+    const canvas = await html2canvas(card, { scale: 2, useCORS: true });
+    const link = document.createElement('a');
+    link.download = `oferta_frutix_${new Date().getTime()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
 };
 
 window.renderClients = () => {
@@ -897,4 +966,41 @@ window.sendWhatsAppReceipt = () => {
     const link = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
     window.open(link, '_blank');
     window.closeModal('receipt-modal');
+};
+
+window.shareCatalog = async () => {
+    // If we are in the Android app (localhost), we need a real public URL to share
+    let url = window.publicCatalogUrl;
+
+    if (!url || url.includes('localhost')) {
+        const inputUrl = prompt("Ingresa el enlace público de tu catálogo de GitHub (ej: https://tronstheking.github.io/Frutix/):", url);
+        if (inputUrl) {
+            url = inputUrl;
+            // Save for future use
+            const userRef = db.collection('users').doc(currentUser.uid);
+            await userRef.collection('settings').doc('global').set({ publicCatalogUrl: url }, { merge: true });
+        } else {
+            return;
+        }
+    }
+
+    const shareText = `🍎 *CATÁLOGO FRUTIX*\n\nHola! Te comparto nuestro catálogo de productos actualizado con los precios del día.\n\n🔗 Ver catálogo aquí: ${url}\n\n¡Esperamos tu pedido! 🍉`;
+
+    // Use Web Share API if available (native Android sharing)
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Catálogo Frutix',
+                text: shareText,
+                url: url
+            });
+        } catch (err) {
+            console.log("Error sharing:", err);
+            // Fallback to WhatsApp
+            window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+        }
+    } else {
+        // Desktop / Browser Fallback
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+    }
 };
