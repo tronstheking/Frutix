@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <title>Inventario Pro</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
@@ -94,7 +95,7 @@
                 <div class="bcv-input-wrapper">
                     <img src="bcv-logo.png" alt="BCV" class="bcv-logo">
                     <span class="currency-symbol">Bs</span>
-                    <input type="number" id="bcv-rate" value="45.00" step="0.01">
+                    <input type="text" id="bcv-rate" value="45.00" inputmode="decimal">
                 </div>
             </div>
         </div>
@@ -184,7 +185,7 @@
             <div class="movements-list" id="movements-list">
                 <!-- Movements list -->
             </div>
-            <button class="fab" onclick="window.openModal('add-movement-modal')">
+            <button class="fab" onclick="window.openAddMovementModal()">
                 <ion-icon name="swap-vertical"></ion-icon>
             </button>
         </section>
@@ -205,7 +206,17 @@
                     <div class="mini-sub-val" id="finance-total-sales-bs">Bs 0.00</div>
                 </div>
                 <div class="finance-mini-card">
-                    <div class="mini-label">Total Costos</div>
+                    <div class="mini-label">Dinero en la Calle</div>
+                    <div class="mini-value text-orange" id="finance-total-debts">$0.00</div>
+                    <div class="mini-sub-val" id="finance-total-debts-bs">Bs 0.00</div>
+                </div>
+                <div class="finance-mini-card">
+                    <div class="mini-label">Gastos Op.</div>
+                    <div class="mini-value text-red" id="finance-total-expenses">$0.00</div>
+                    <div class="mini-sub-val" id="finance-total-expenses-bs">Bs 0.00</div>
+                </div>
+                <div class="finance-mini-card">
+                    <div class="mini-label">Costos Stock</div>
                     <div class="mini-value text-red" id="finance-total-costs">$0.00</div>
                     <div class="mini-sub-val" id="finance-total-costs-bs">Bs 0.00</div>
                 </div>
@@ -306,6 +317,30 @@
             </button>
         </section>
 
+        <!-- CATALOG VIEW -->
+        <section id="catalog" class="page">
+            <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h4>Catálogo Digital</h4>
+                    <p style="font-size:0.8rem; color:var(--text-secondary);">Tus productos visibles para clientes</p>
+                </div>
+                <button class="icon-btn" onclick="window.shareCatalog()">
+                    <ion-icon name="share-social-outline" style="color:var(--primary-color);"></ion-icon>
+                </button>
+            </div>
+
+            <div class="search-bar">
+                <ion-icon name="search-outline"></ion-icon>
+                <input type="text" id="catalog-search" placeholder="Buscar en catálogo..."
+                    oninput="window.renderCatalog()">
+            </div>
+
+            <div class="movements-list" id="catalog-list"
+                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px;">
+                <!-- Catalog items rendered here -->
+            </div>
+        </section>
+
         <!-- ORDERS SECTION (WISH-LIST / SPECIAL ORDERS) -->
         <section id="orders-view" class="page">
             <div class="section-title">
@@ -321,6 +356,22 @@
             </button>
         </section>
 
+        </section>
+
+        <!-- CLOSURE HISTORY SECTION -->
+        <section id="closure-history" class="page">
+            <div class="section-title">
+                <h4>Historial de Cierres (Z)</h4>
+                <p style="font-size:0.8rem; color:var(--text-secondary);">Registro de todos tus cierres definitivos</p>
+            </div>
+            <div class="movements-list" id="history-list">
+                <!-- History items rendered here -->
+                <div class="empty-state">
+                    <ion-icon name="time-outline"></ion-icon>
+                    <p>No hay cierres registrados aún</p>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- Bottom Navigation -->
@@ -345,6 +396,10 @@
             <ion-icon name="stats-chart-outline"></ion-icon>
             <span>Reportes</span>
         </a>
+        <a href="#" class="nav-item" data-target="closure-history">
+            <ion-icon name="time-outline"></ion-icon>
+            <span>Historial</span>
+        </a>
         <a href="#" class="nav-item" data-target="debts">
             <ion-icon name="people-outline"></ion-icon>
             <span>Deudas</span>
@@ -366,12 +421,20 @@
             <div id="closure-results" class="summary-list">
                 <!-- Filled by JS -->
             </div>
-            <div class="modal-footer-btns">
-                <button class="btn-primary btn-green" onclick="window.exportToPNG()">
-                    <ion-icon name="image-outline"></ion-icon> Exportar PNG
-                </button>
-                <button class="btn-primary btn-blue" onclick="window.exportToPDF()">
-                    <ion-icon name="document-text-outline"></ion-icon> Exportar PDF
+            <div class="modal-footer-btns" style="flex-direction: column; gap: 10px;">
+                <div style="display:flex; gap:10px; width:100%;">
+                    <button class="btn-primary" style="background: var(--warning-color); flex:1;"
+                        onclick="window.exportToPDF('X')">
+                        <ion-icon name="print-outline"></ion-icon> Reporte X (Parcial)
+                    </button>
+                    <button class="btn-primary" style="background: var(--success-color); flex:1;"
+                        onclick="window.exportToPDF('Z')">
+                        <ion-icon name="save-outline"></ion-icon> Reporte Z (Cierre)
+                    </button>
+                </div>
+                <button class="btn-secondary" style="width:100%; border:1px solid var(--border-color);"
+                    onclick="window.exportToPNG()">
+                    <ion-icon name="image-outline"></ion-icon> Guardar Imagen Rápida
                 </button>
             </div>
 
@@ -421,19 +484,29 @@
                         <input type="text" name="code" placeholder="Ej: FRS-001">
                     </div>
                 </div>
+
                 <div class="form-group-row">
                     <div class="form-group">
-                        <label>Costo por Kg ($)</label>
+                        <label>Unidad de Medida</label>
+                        <select name="unit_type">
+                            <option value="Kg">Kilogramos (Kg)</option>
+                            <option value="Und">Unidades (Und)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label>Costo Unitario ($)</label>
                         <input type="number" name="cost" step="0.01" required>
                     </div>
                     <div class="form-group">
-                        <label>Precio Venta por Kg ($)</label>
+                        <label>Precio Venta ($)</label>
                         <input type="number" name="price" step="0.01" required>
                     </div>
                 </div>
                 <div class="form-group-row">
                     <div class="form-group">
-                        <label>Kilos Iniciales (Kg)</label>
+                        <label>Cantidad Inicial</label>
                         <input type="number" name="stock" step="0.1" required>
                     </div>
                 </div>
@@ -476,7 +549,7 @@
                 </div>
                 <div class="form-group" id="product-select-field">
                     <label>Producto</label>
-                    <select name="product_id" id="movement-product-select">
+                    <select name="product_id" id="movement-product-select" onchange="window.updateMovInfo()">
                         <!-- Options filled by JS -->
                     </select>
                 </div>
@@ -519,13 +592,18 @@
 
                     <div class="form-group hidden" id="payment-type-field">
                         <label>Sub-método (Caja)</label>
-                        <select name="payment_type" id="movement-payment-type">
+                        <select name="payment_type" id="movement-payment-type" onchange="window.toggleMovementFields()">
                             <option value="cash_usd">Efectivo ($)</option>
                             <option value="cash_bs">Efectivo (Bs)</option>
                             <option value="mobile_pay">Pago Móvil</option>
                             <option value="transfer">Transferencia</option>
                             <option value="zelle">Zelle</option>
                         </select>
+                    </div>
+
+                    <div class="form-group hidden" id="reference-field">
+                        <label>Ref. / Últimos 4 Dígitos</label>
+                        <input type="text" name="reference" placeholder="Ej: 1234">
                     </div>
 
                     <div class="form-group hidden" id="supplier-select-field">
@@ -557,14 +635,137 @@
                     </div>
                 </div>
 
+                <div class="form-group-row" style="display: flex; gap: 10px; align-items:flex-end;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Pagó con ($)</label>
+                        <input type="number" id="mov-received" min="0" step="0.01" placeholder="Ej: 20"
+                            oninput="window.updateMovInfo()" style="border-color:var(--primary-color);">
+                    </div>
+                    <div class="form-group hidden" id="delivery-field" style="flex: 1;">
+                        <label>Delivery/Extra ($)</label>
+                        <input type="number" name="delivery" id="mov-delivery" min="0" step="0.1" value="0"
+                            oninput="window.updateMovInfo()" style="border-color:var(--secondary-color);">
+                    </div>
+                </div>
+
+                <div class="form-group hidden" id="notes-field">
+                    <label>Notas / Obs. (Pago Mixto)</label>
+                    <textarea name="notes" placeholder="Ej: $5 Efvo + $10 Pago Móvil..." rows="2"
+                        style="width:100%; padding:10px; border-radius:10px; border:1px solid #ddd;"></textarea>
+                </div>
+
                 <div id="sale-info" class="info-box">
-                    Precio Venta Unitario: $<span id="info-price">0.00</span><br>
-                    Total a Recibir: $<span id="info-total">0.00</span>
+                    <div style="margin-bottom:5px;">Precio Unitario: $<span id="info-price">0.00</span></div>
+                    <div
+                        style="font-size:1.1rem; font-weight:700; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:5px; margin-bottom:5px;">
+                        Total: $<span id="info-total">0.00</span> / <span id="info-total-bs"
+                            style="color:var(--primary-color)">Bs 0.00</span></div>
+
+                    <div id="change-info" style="display:none; color:var(--success-color);">
+                        <div>Vuelto: <strong id="info-change-usd">$0.00</strong></div>
+                        <div style="font-size:0.9rem;">o en Bs: <strong id="info-change-bs">Bs 0.00</strong></div>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn-primary">Registrar</button>
             </form>
         </div>
+    </div>
+
+    </div>
+
+    <!-- MODAL: PRODUCT DETAIL & QUICK STOCK -->
+    <div id="product-detail-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Detalle de Producto</h3>
+                <span class="close-modal" onclick="window.closeModal('product-detail-modal')"><ion-icon
+                        name="close-outline"></ion-icon></span>
+            </div>
+
+            <div id="product-detail-content" style="text-align:center; padding: 10px 0;">
+                <div id="detail-image-container"
+                    style="width:120px; height:120px; border-radius:15px; overflow:hidden; margin:0 auto 15px auto; background:#f0f0f0; display:flex; align-items:center; justify-content:center;">
+                    <!-- Filled by JS -->
+                </div>
+
+                <h2 id="detail-name" style="margin:0; color:var(--text-primary);">Nombre Producto</h2>
+                <div id="detail-code" style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:15px;">COD-001
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+                    <div
+                        style="background:var(--bg-color); padding:10px; border-radius:10px; border:1px solid var(--border-color);">
+                        <small style="color:var(--text-secondary);">Precio Venta</small>
+                        <div id="detail-price" style="font-weight:700; font-size:1.1rem; color:var(--primary-color);">
+                            $0.00</div>
+                        <div id="detail-price-bs" style="font-size:0.8rem; color:var(--text-secondary);">Bs 0.00</div>
+                    </div>
+                    <div
+                        style="background:var(--bg-color); padding:10px; border-radius:10px; border:1px solid var(--border-color);">
+                        <small style="color:var(--text-secondary);">Stock Actual</small>
+                        <div id="detail-stock" style="font-weight:700; font-size:1.1rem; color:var(--text-primary);">0.0
+                        </div>
+                        <div id="detail-unit" style="font-size:0.8rem; color:var(--text-secondary);">Kg</div>
+                    </div>
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border-color); margin: 15px 0;">
+
+                <h4 style="margin-bottom:10px; text-align:left;">Reponer Stock Rápido (Entrada)</h4>
+                <div style="display:flex; gap:10px;">
+                    <input type="number" id="quick-add-qty" placeholder="Cantidad a sumar"
+                        style="flex:1; padding:12px; border:1px solid var(--border-color); border-radius:10px; font-size:1rem;">
+                    <button class="btn-primary" onclick="window.submitQuickStock()"
+                        style="width:auto; padding: 0 20px;">
+                        <ion-icon name="add-circle-outline"></ion-icon> Añadir
+                    </button>
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border-color); margin: 15px 0;">
+
+                <h4 style="margin-bottom:10px; text-align:left;">Actualizar Precios ($)</h4>
+                <div style="display:flex; gap:10px; margin-bottom: 10px;">
+                    <div style="flex:1">
+                        <label
+                            style="font-size:0.8rem; display:block; margin-bottom:5px; text-align:left; color:var(--text-secondary);">Costo
+                            Unitario</label>
+                        <input type="number" id="detail-edit-cost" step="0.01"
+                            style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:10px;"
+                            oninput="window.updatePriceMonitor()">
+                    </div>
+                    <div style="flex:1">
+                        <label
+                            style="font-size:0.8rem; display:block; margin-bottom:5px; text-align:left; color:var(--text-secondary);">Precio
+                            Venta</label>
+                        <input type="number" id="detail-edit-price" step="0.01"
+                            style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:10px;"
+                            oninput="window.updatePriceMonitor()">
+                    </div>
+                </div>
+
+                <!-- NEW: VENEZUELAN MONITOR WIDGET -->
+                <div id="price-monitor"
+                    style="background:rgba(0,122,255,0.05); padding:10px; border-radius:10px; margin-bottom:15px; border:1px solid rgba(0,122,255,0.1); display:none;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <span style="font-size:0.85rem; color:var(--text-secondary);">Margen:</span>
+                        <strong id="monitor-margin" style="font-size:0.9rem;">0%</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span id="monitor-bs-label" style="font-size:0.85rem; color:var(--text-secondary);">Oficial
+                            BCV:</span>
+                        <strong id="monitor-bs" style="font-size:1rem; color:var(--primary-color);">Bs 0.00</strong>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-primary" onclick="window.submitPriceUpdate()"
+                style="background-color: #5856D6; width: 100%;">
+                <ion-icon name="pricetag-outline"></ion-icon> Guardar Nuevos Precios
+            </button>
+        </div>
+        <input type="hidden" id="detail-product-id">
+    </div>
+    </div>
     </div>
 
     <script src="app.js"></script>
@@ -670,6 +871,24 @@
                 </div>
                 <button type="submit" class="btn-primary">Anotar Pedido</button>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: RECENT PAYMENTS (AUDIT) -->
+    <div id="recent-payments-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h3 id="recent-payments-title">Auditoría de Pagos</h3>
+                    <small style="color:var(--text-secondary)" id="recent-payments-subtitle">Últimos 10
+                        movimientos</small>
+                </div>
+                <span class="close-modal" onclick="window.closeModal('recent-payments-modal')"><ion-icon
+                        name="close-outline"></ion-icon></span>
+            </div>
+            <div id="recent-payments-list" style="margin-top:15px; display:flex; flex-direction:column; gap:8px;">
+                <!-- Filled by JS -->
+            </div>
         </div>
     </div>
 </body>
