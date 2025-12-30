@@ -20,10 +20,22 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <!-- html2canvas for exporting as PNG -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Chart.js for banker-style professional charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS for Excel Exports -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
 
 <body class="auth-mode"> <!-- Start in auth mode -->
+
+    <!-- APPLE STYLE SPLASH SCREEN -->
+    <div id="splash-screen" class="splash-screen">
+        <div class="splash-content">
+            <img src="logo.png" alt="Logo" class="splash-logo">
+            <div class="splash-loader"></div>
+        </div>
+    </div>
 
     <!-- AUTH SCREEN -->
     <div id="auth-screen" class="auth-screen">
@@ -107,9 +119,15 @@
                 <button class="btn-closure" onclick="window.processDayClosure()">Cerrar Día</button>
             </div>
 
-            <div class="alert-box hidden" id="low-stock-alert">
-                <ion-icon name="warning"></ion-icon>
-                <span>Hay productos con stock bajo</span>
+            <div style="margin-top: 25px;">
+                <button class="btn-primary" onclick="window.exportToExcel()"
+                    style="background: var(--success-color); border-radius: 20px;">
+                    <ion-icon name="download-outline"></ion-icon> Respaldar Inventario (Excel)
+                </button>
+            </div>
+
+            <div id="low-stock-alert" class="hidden" style="margin-top: 25px;">
+                <!-- Filled by JS -->
             </div>
         </section>
 
@@ -135,6 +153,14 @@
 
         <!-- MOVEMENTS SECTION -->
         <section id="movements" class="page">
+            <div class="search-bar" style="margin-bottom: 15px;">
+                <ion-icon name="calendar-outline"></ion-icon>
+                <input type="date" id="movement-date-filter" onchange="window.renderMovements()"
+                    style="padding: 10px; font-weight: 600;">
+                <button onclick="document.getElementById('movement-date-filter').value=''; window.renderMovements();"
+                    style="background:none; border:none; color:var(--text-secondary); padding:5px; display:flex; align-items:center;"><ion-icon
+                        name="close-circle" style="font-size:1.2rem;"></ion-icon></button>
+            </div>
             <div class="tabs">
                 <button class="tab-btn active" onclick="window.filterMovements('all')">Todos</button>
                 <button class="tab-btn" onclick="window.filterMovements('in')">Entradas</button>
@@ -171,13 +197,10 @@
             </div>
 
             <div class="finance-analytics">
-                <h4>Distribución de Flujo</h4>
-                <div class="progress-container">
-                    <div class="progress-bar" id="finance-progress-bar" style="width: 0%"></div>
-                </div>
-                <div class="progress-labels">
-                    <span>Inversión</span>
-                    <span>Ganancia Bruta</span>
+                <h4>Distribución de Ingresos</h4>
+                <div id="finance-cash-breakdown"
+                    style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
+                    <!-- Breakdown injected by JS -->
                 </div>
             </div>
 
@@ -191,17 +214,24 @@
         <!-- REPORTS SECTION -->
         <section id="reports" class="page">
             <div class="report-card">
-                <h4>Tendencia de Ventas (Semana)</h4>
-                <div class="trend-chart" id="trend-chart-container">
-                    <!-- Bars filled by JS -->
+                <h4>Distribución de Ventas ($)</h4>
+                <div class="chart-container-premium">
+                    <canvas id="salesPieChart"></canvas>
                 </div>
             </div>
 
             <div class="report-card">
-                <h4>Top Frutas Más Vendidas (Kg)</h4>
-                <ul id="top-products-list">
-                    <!-- List -->
-                </ul>
+                <h4>Ventas por Producto (Kg)</h4>
+                <div class="chart-container-premium">
+                    <canvas id="productsPieChart"></canvas>
+                </div>
+            </div>
+
+            <div class="report-card">
+                <h4>Tendencia de Ventas (Semana)</h4>
+                <div class="trend-chart" id="trend-chart-container">
+                    <!-- Bars filled by JS -->
+                </div>
             </div>
         </section>
 
@@ -225,6 +255,48 @@
             </div>
             <button class="fab" onclick="window.openModal('add-supplier-modal')">
                 <ion-icon name="business-outline"></ion-icon>
+            </button>
+        </section>
+
+        <!-- CATALOG SECTION (CUSTOMER VIEW) -->
+        <section id="catalog" class="page">
+            <div class="section-title">
+                <h4>Catálogo de Productos</h4>
+                <p style="font-size:0.8rem; color:var(--text-secondary);">Precios vigentes al día de hoy</p>
+            </div>
+
+            <div class="catalog-grid" id="catalog-list">
+                <!-- Catalog items injected by JS -->
+            </div>
+        </section>
+
+        <!-- CLIENTS SECTION (CRM) -->
+        <section id="clients-view" class="page">
+            <div class="search-bar">
+                <ion-icon name="people-outline"></ion-icon>
+                <input type="text" id="clients-search" placeholder="Buscar clientes..."
+                    oninput="window.renderClients()">
+            </div>
+            <div class="clients-list" id="clients-list">
+                <!-- Clients list -->
+            </div>
+            <button class="fab" onclick="window.openModal('add-client-modal')">
+                <ion-icon name="person-add-outline"></ion-icon>
+            </button>
+        </section>
+
+        <!-- ORDERS SECTION (WISH-LIST / SPECIAL ORDERS) -->
+        <section id="orders-view" class="page">
+            <div class="section-title">
+                <h4>Pedidos Especiales</h4>
+                <p style="font-size:0.8rem; color:var(--text-secondary);">Productos solicitados que no tenemos en stock
+                </p>
+            </div>
+            <div class="movements-list" id="orders-list">
+                <!-- Orders list -->
+            </div>
+            <button class="fab" onclick="window.openModal('add-order-modal')">
+                <ion-icon name="cart-outline"></ion-icon>
             </button>
         </section>
 
@@ -260,6 +332,18 @@
             <ion-icon name="business-outline"></ion-icon>
             <span>Proveed.</span>
         </a>
+        <a href="#" class="nav-item" data-target="catalog">
+            <ion-icon name="book-outline"></ion-icon>
+            <span>Catálogo</span>
+        </a>
+        <a href="#" class="nav-item" data-target="clients-view">
+            <ion-icon name="people-outline"></ion-icon>
+            <span>Clientes</span>
+        </a>
+        <a href="#" class="nav-item" data-target="orders-view">
+            <ion-icon name="basket-outline"></ion-icon>
+            <span>Pedidos</span>
+        </a>
     </nav>
 
     <!-- MODAL: DAY CLOSURE SUMMARY -->
@@ -267,15 +351,19 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Cierre de Caja</h3>
-                <span class="close-modal" onclick="window.closeModal('closure-modal')">&times;</span>
+                <span class="close-modal" onclick="window.closeModal('closure-modal')"><ion-icon
+                        name="close-outline"></ion-icon></span>
             </div>
             <div id="closure-results" class="summary-list">
                 <!-- Filled by JS -->
             </div>
             <div class="modal-footer-btns">
-                <button class="btn-secondary" onclick="window.exportToPNG()"
-                    style="background: var(--primary-color);">Exportar PNG</button>
-                <button class="btn-secondary" onclick="window.exportToPDF()">PDF</button>
+                <button class="btn-primary btn-green" onclick="window.exportToPNG()">
+                    <ion-icon name="image-outline"></ion-icon> Exportar PNG
+                </button>
+                <button class="btn-primary btn-blue" onclick="window.exportToPDF()">
+                    <ion-icon name="document-text-outline"></ion-icon> Exportar PDF
+                </button>
             </div>
 
         </div>
@@ -286,7 +374,8 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Nuevo Proveedor</h3>
-                <span class="close-modal" onclick="window.closeModal('add-supplier-modal')">&times;</span>
+                <span class="close-modal" onclick="window.closeModal('add-supplier-modal')"><ion-icon
+                        name="close-outline"></ion-icon></span>
             </div>
             <form id="add-supplier-form">
                 <div class="form-group">
@@ -309,12 +398,19 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Nuevo Producto</h3>
-                <span class="close-modal" onclick="window.closeModal('add-product-modal')">&times;</span>
+                <span class="close-modal" onclick="window.closeModal('add-product-modal')"><ion-icon
+                        name="close-outline"></ion-icon></span>
             </div>
             <form id="add-product-form">
-                <div class="form-group">
-                    <label>Nombre del Producto</label>
-                    <input type="text" name="name" required>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label>Nombre del Producto</label>
+                        <input type="text" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Código</label>
+                        <input type="text" name="code" placeholder="Ej: FRS-001">
+                    </div>
                 </div>
                 <div class="form-group-row">
                     <div class="form-group">
@@ -326,9 +422,16 @@
                         <input type="number" name="price" step="0.01" required>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Kilos Iniciales (Kg)</label>
-                    <input type="number" name="stock" step="0.1" required>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label>Kilos Iniciales (Kg)</label>
+                        <input type="number" name="stock" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Imagen del Producto</label>
+                        <input type="file" name="image" accept="image/*" id="product-image-input"
+                            style="font-size: 0.8rem; padding: 10px;">
+                    </div>
                 </div>
                 <button type="submit" class="btn-primary">Guardar Producto</button>
             </form>
@@ -340,7 +443,8 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Registrar Movimiento</h3>
-                <span class="close-modal" onclick="window.closeModal('add-movement-modal')">&times;</span>
+                <span class="close-modal" onclick="window.closeModal('add-movement-modal')"><ion-icon
+                        name="close-outline"></ion-icon></span>
             </div>
             <form id="add-movement-form">
                 <div class="form-group">
@@ -349,19 +453,37 @@
                         <option value="out">Venta (Salida)</option>
                         <option value="in">Compra/Reposición (Entrada)</option>
                         <option value="waste">Merma (Desperdicio)</option>
+                        <option value="expense">Gasto Operativo (Negocio)</option>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="product-select-field">
                     <label>Producto</label>
-                    <select name="product_id" id="movement-product-select" required>
+                    <select name="product_id" id="movement-product-select">
                         <!-- Options filled by JS -->
                     </select>
+                </div>
+                <div class="form-group hidden" id="expense-category-field">
+                    <label>Categoría del Gasto</label>
+                    <select name="expense_category" id="expense-category">
+                        <option value="Servicios">Servicios (Luz, Agua, Internet)</option>
+                        <option value="Local">Alquiler / Local</option>
+                        <option value="Sueldos">Sueldos / Comisiones</option>
+                        <option value="Transporte">Transporte / Gasolina</option>
+                        <option value="Insumos">Insumos (Bolsas, Limpieza)</option>
+                        <option value="Mantenimiento">Mantenimiento</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                </div>
+                <div class="form-group hidden" id="expense-reason-field">
+                    <label>Nota / Detalle (Opcional)</label>
+                    <input type="text" name="reason" placeholder="Ej: Pago de Luz mes Octubre">
                 </div>
 
                 <div id="extra-fields" style="display:contents">
                     <div class="form-group" id="payment-method-field">
                         <label>Método de Pago</label>
-                        <select name="payment_method" id="movement-payment-method">
+                        <select name="payment_method" id="movement-payment-method"
+                            onchange="window.toggleMovementFields()">
                             <option value="cash">Al Contado</option>
                             <option value="debt">Fiado (A Crédito)</option>
                         </select>
@@ -372,6 +494,22 @@
                         <input type="text" name="client_name" placeholder="Ej: Sr. Manuel">
                     </div>
 
+                    <div class="form-group hidden" id="client-phone-field">
+                        <label>Teléfono del Cliente</label>
+                        <input type="tel" name="client_phone" placeholder="Ej: 04121234567">
+                    </div>
+
+                    <div class="form-group hidden" id="payment-type-field">
+                        <label>Sub-método (Caja)</label>
+                        <select name="payment_type" id="movement-payment-type">
+                            <option value="cash_usd">Efectivo ($)</option>
+                            <option value="cash_bs">Efectivo (Bs)</option>
+                            <option value="mobile_pay">Pago Móvil</option>
+                            <option value="transfer">Transferencia</option>
+                            <option value="zelle">Zelle</option>
+                        </select>
+                    </div>
+
                     <div class="form-group hidden" id="supplier-select-field">
                         <label>Proveedor</label>
                         <select name="supplier_id" id="movement-supplier-select">
@@ -380,9 +518,17 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Cantidad (Kg)</label>
-                    <input type="number" name="quantity" min="0.1" step="0.1" required>
+                <div class="form-group-row" style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Cantidad (Kg)</label>
+                        <input type="number" name="quantity" id="mov-qty" min="0.1" step="0.1" required
+                            oninput="window.updateMovInfo()">
+                    </div>
+                    <div class="form-group hidden" id="discount-field" style="flex: 1;">
+                        <label>Descuento ($)</label>
+                        <input type="number" name="discount" id="mov-discount" min="0" step="0.1" value="0"
+                            oninput="window.updateMovInfo()">
+                    </div>
                 </div>
 
                 <div id="sale-info" class="info-box">
@@ -396,6 +542,77 @@
     </div>
 
     <script src="app.js"></script>
+    <!-- MODAL: DIGITAL RECEIPT -->
+    <div id="receipt-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Recibo Digital</h3>
+                <span class="close-modal" onclick="window.closeModal('receipt-modal')"><ion-icon
+                        name="close-outline"></ion-icon></span>
+            </div>
+            <div id="receipt-content"
+                style="background: #fff; color: #000; padding: 20px; border-radius: 12px; margin-bottom: 20px; font-family: monospace; white-space: pre-wrap; font-size: 0.9rem;">
+                <!-- Receipt text -->
+            </div>
+            <div class="form-group">
+                <label>Teléfono del Cliente (Opcional)</label>
+                <input type="tel" id="receipt-phone" placeholder="Ej: 584120000000">
+            </div>
+            <button class="btn-primary btn-green" onclick="window.sendWhatsAppReceipt()">
+                <ion-icon name="logo-whatsapp"></ion-icon> Enviar por WhatsApp
+            </button>
+        </div>
+    </div>
+    <!-- MODAL: ADD CLIENT -->
+    <div id="add-client-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nuevo Cliente</h3>
+                <span class="close-modal" onclick="window.closeModal('add-client-modal')"><ion-icon
+                        name="close-outline"></ion-icon></span>
+            </div>
+            <form id="add-client-form">
+                <div class="form-group">
+                    <label>Nombre Completo</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label>Teléfono (WhatsApp)</label>
+                    <input type="tel" name="phone" placeholder="Ej: 04121234567">
+                </div>
+                <div class="form-group">
+                    <label>Dirección / Nota</label>
+                    <input type="text" name="note" placeholder="Ej: Vecino del local">
+                </div>
+                <button type="submit" class="btn-primary">Registrar Cliente</button>
+            </form>
+        </div>
+    </div>
+    <!-- MODAL: ADD SPECIAL ORDER -->
+    <div id="add-order-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nuevo Pedido Especial</h3>
+                <span class="close-modal" onclick="window.closeModal('add-order-modal')"><ion-icon
+                        name="close-outline"></ion-icon></span>
+            </div>
+            <form id="add-order-form">
+                <div class="form-group">
+                    <label>¿Qué pidió el cliente?</label>
+                    <input type="text" name="product_name" placeholder="Ej: Frambuesas frescas" required>
+                </div>
+                <div class="form-group">
+                    <label>Cliente (Nombre/Tel)</label>
+                    <input type="text" name="customer_info" placeholder="Ej: Sra. Maria (0414...)">
+                </div>
+                <div class="form-group">
+                    <label>Cantidad aproximada</label>
+                    <input type="text" name="estimated_qty" placeholder="Ej: 2 bandejas">
+                </div>
+                <button type="submit" class="btn-primary">Anotar Pedido</button>
+            </form>
+        </div>
+    </div>
 </body>
 
 </html>
